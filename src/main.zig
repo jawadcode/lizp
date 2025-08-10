@@ -1,14 +1,16 @@
 const std = @import("std");
-const lib = @import("default_lib");
+const Parser = @import("default_lib").Parser;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const allocator = gpa.allocator();
+    const alloc = gpa.allocator();
 
-    const source = "(123 123 123)";
-    const output = lib.parser.parse(source, allocator)
+    const source = "123";
+    var parser = Parser.new(source);
+    const output = parser
+        .next(alloc)
         .unwrap()
         .node
-        .format_sexp(allocator) catch unreachable;
+        .format_sexp(alloc) catch unreachable;
     std.log.info("Input: {s}\nOutput:\n{s}", .{ source, output.items });
 }

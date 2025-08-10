@@ -7,7 +7,7 @@ pub const SExp = Spanned(SExpInner);
 const INDENT_WIDTH = 2;
 
 pub const SExpInner = union(enum) {
-    int: i32,
+    int: i64,
     string: []const u8,
     @"var": []const u8,
     list: std.ArrayList(SExp),
