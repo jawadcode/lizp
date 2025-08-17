@@ -61,12 +61,12 @@ pub fn PeekIter(comptime I: type, comptime T: type) type {
             };
         }
 
-        pub fn peek(iter: *@This()) *T {
+        pub fn peek(iter: *@This()) ?*const T {
             if (iter.peeked == null) {
                 iter.peeked = iter.inner.next();
             }
 
-            return &iter.peeked.?;
+            return if (iter.peeked) |*val| val else null;
         }
 
         pub fn next(iter: *@This()) ?T {

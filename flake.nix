@@ -70,6 +70,7 @@
         nativeBuildInputs =
           [
             env.pkgs.zls
+            env.pkgs.lldb
           ]
           ++ packages.default.nativeBuildInputs
           ++ packages.default.buildInputs
