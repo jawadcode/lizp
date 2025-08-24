@@ -87,7 +87,23 @@ fn number(lexer: *Lexer) TokenKind {
 }
 
 fn skipWhitespace(lexer: *Lexer) void {
-    while (!lexer.isAtEnd() and char.isWhitespace(lexer.source[lexer.cursor])) : (lexer.cursor += 1) {}
+    while (true) {
+        if (lexer.peek()) |ch| {
+            switch (ch) {
+                ';' => {
+                    lexer.cursor += 1;
+                    while (!lexer.isAtEnd() and lexer.peek().? != '\n') : (lexer.cursor += 1) {}
+                },
+                else => |c| if (char.isWhitespace(c)) {
+                    lexer.cursor += 1;
+                } else {
+                    return;
+                },
+            }
+        } else {
+            return;
+        }
+    }
 }
 
 fn isAtEnd(lexer: *Lexer) bool {

@@ -26,7 +26,7 @@ pub fn main() !void {
         if (line.len > 1 and line[0] == ':') {
             const rest = line[1..];
             if (std.mem.eql(u8, rest, "q") or std.mem.eql(u8, rest, "quit")) {
-                try stdout.writeAll("Goodbye 👋");
+                try stdout.writeAll("Goodbye 👋\n");
                 std.process.exit(0);
             }
         }
@@ -43,8 +43,8 @@ pub fn main() !void {
         //     }
         // }
 
-        var parser = Parser.new(line);
-        const sexp = parser.next(alloc);
+        var parser = Parser.new(line, alloc);
+        const sexp = parser.next();
         const output = switch (sexp) {
             .okay => |o| o.node.format_sexp(alloc) catch undefined,
             .err => |e| {

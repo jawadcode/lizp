@@ -8,18 +8,26 @@ const Lexer = @import("Lexer.zig");
 // String is a message describing the expected token
 const ParseError = Spanned([]const u8);
 
-const ParseResult = @import("utils.zig").Result(SExp, ParseError);
+const Result = @import("utils.zig").Result;
+
+fn ParseRes(comptime O: type) type {
+    return Result(O, ParseError);
+}
+
+const ParseResult = ParseRes(SExp);
 const PeekLexer = @import("utils.zig").PeekIter(Lexer, Lexer.Token);
 
 const Parser = @This();
 
+source: []const u8,
 lexer: PeekLexer,
+alloc: std.mem.Allocator,
 
-pub fn new(source: []const u8) Parser {
-    return Parser{ .lexer = PeekLexer.new(Lexer.new(source)) };
+pub fn new(source: []const u8, alloc: std.mem.Allocator) Parser {
+    return Parser{ .source = source, .lexer = PeekLexer.new(Lexer.new(source)), .alloc = alloc };
 }
 
-pub fn next(parser: *Parser, alloc: std.mem.Allocator) ParseResult {
+pub fn next(parser: *Parser) ParseResult {
     const peeked = parser.peek();
     const start_tok = parser.lexer.next().?;
     switch (peeked) {
@@ -29,13 +37,13 @@ pub fn next(parser: *Parser, alloc: std.mem.Allocator) ParseResult {
         },
         .symbol => {
             const tok_src = parser.text(start_tok);
-            return ParseResult.new_okay(SExp{ .node = SExpInner{ .@"var" = tok_src }, .start = start_tok.start, .end = start_tok.end });
+            return ParseResult.new_okay(SExp{ .node = SExpInner{ .atom = tok_src }, .start = start_tok.start, .end = start_tok.end });
         },
         .string => {
             const str = parser.text(start_tok);
             // str = str[1..(str.len - 1)];
 
-            var str_res = std.ArrayList(u8).initCapacity(alloc, str.len - 2) catch @panic("OOM");
+            var str_res = std.ArrayList(u8).initCapacity(parser.alloc, str.len - 2) catch @panic("OOM");
 
             var index: usize = 1;
             var escaped = false;
@@ -60,14 +68,17 @@ pub fn next(parser: *Parser, alloc: std.mem.Allocator) ParseResult {
             return ParseResult.new_okay(SExp{ .node = SExpInner{ .string = str_res }, .start = start_tok.start, .end = start_tok.end });
         },
         .lparen => {
-            var exprs = std.ArrayList(SExp).init(alloc);
-            while (parser.peek() != .rparen) {
-                switch (parser.next(alloc)) {
+            var exprs = std.ArrayList(SExp).init(parser.alloc);
+            while (parser.peek() != .rparen and parser.peek() != .eof) {
+                switch (parser.next()) {
                     .okay => |o| exprs.append(o) catch @panic("OOM"),
                     .err => |e| return ParseResult.new_err(e),
                 }
             }
-            const rparen = parser.lexer.next().?;
+            const rparen = switch (parser.expect(.rparen)) {
+                .okay => |tok| tok,
+                .err => |e| return ParseResult.new_err(e),
+            };
             return ParseResult.new_okay(SExp{ .node = SExpInner{ .list = exprs }, .start = start_tok.start, .end = rparen.end });
         },
         else => return ParseResult.new_err(ParseError{ .node = "number, symbol, string or '('", .start = start_tok.start, .end = start_tok.end }),
@@ -76,6 +87,20 @@ pub fn next(parser: *Parser, alloc: std.mem.Allocator) ParseResult {
 
 fn peek(parser: *Parser) Lexer.TokenKind {
     return if (parser.lexer.peek()) |peeked| peeked.node else .eof;
+}
+
+const TokResult = ParseRes(Lexer.Token);
+
+fn expect(parser: *Parser, expected: Lexer.TokenKind) TokResult {
+    const tok = if (parser.lexer.next()) |tok|
+        tok
+    else
+        return TokResult.new_err(ParseError{ .node = @tagName(expected), .start = parser.source.len, .end = parser.source.len });
+
+    return if (tok.node == expected)
+        TokResult.new_okay(tok)
+    else
+        TokResult.new_err(ParseError{ .node = @tagName(expected), .start = tok.start, .end = tok.end });
 }
 
 fn text(parser: *Parser, tok: Lexer.Token) []const u8 {

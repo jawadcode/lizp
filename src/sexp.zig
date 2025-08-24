@@ -4,13 +4,13 @@ const Spanned = @import("utils.zig").Spanned;
 
 pub const SExp = Spanned(SExpInner);
 
-const INDENT_WIDTH = 2;
+const INDENT_WIDTH = 1;
 
 pub const SExpInner = union(enum) {
     int: i64,
-    list: std.ArrayList(SExp),
     string: std.ArrayList(u8),
-    @"var": []const u8,
+    atom: []const u8,
+    list: std.ArrayList(SExp),
 
     pub fn format_sexp(self: @This(), alloc: std.mem.Allocator) !std.ArrayList(u8) {
         var buf = std.ArrayList(u8).init(alloc);
@@ -29,13 +29,15 @@ pub const SExpInner = union(enum) {
                 _ = try writer.write(string.items);
                 _ = try writer.writeByte('"');
             },
-            .@"var" => |ident| _ = try writer.write(ident),
+            .atom => |ident| _ = try writer.write(ident),
             .list => |list| {
                 _ = try writer.writeByte('(');
-                try list.items[0].node.fmt_sexp(writer, 0);
-                for (list.items[1..]) |sexp| {
-                    _ = try writer.write("\n ");
-                    try sexp.node.fmt_sexp(writer, indent + 1);
+                if (list.items.len >= 1) {
+                    try list.items[0].node.fmt_sexp(writer, 0);
+                    for (list.items[1..]) |sexp| {
+                        _ = try writer.write("\n");
+                        try sexp.node.fmt_sexp(writer, indent + 1);
+                    }
                 }
                 _ = try writer.writeByte(')');
             },
